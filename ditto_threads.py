@@ -5,7 +5,6 @@ import mysql_manager
 import os
 from dotenv import load_dotenv
 from model.DittoUserInformation import DittoUserInformation
-from datetime import datetime
 
 load_dotenv()
 N_DAYS = int(os.getenv('N_DAYS'))
@@ -32,11 +31,9 @@ class DittoCurrentStateThread(threading.Thread):
         data = mysql_manager.selectValues(self.clientId)
         print(data)
         if len(data) >= 10:
-            daysOffset = (user.generalInfo.features.goal.properties.date - datetime.now()).days
-            prediction = ditto_utils.getPredictions(data, daysOffset)
-            print(prediction)
-            #TODO: Generate training plan and upload to Ditto
-            #TODO: Generate suggestions and upload to Ditto
+            features = ditto_utils.updateThing(data, user.generalInfo.features.goal.properties, user.generalInfo.features.preferences.properties)
+            user.generalInfo.features = features
+            user.uploadChanges()
 
 class DittoGeneralInfoThread(threading.Thread):
     def __init__(self, clientId):

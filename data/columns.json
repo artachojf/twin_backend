@@ -1,0 +1,10 @@
+{
+    "file": "data.csv",
+    "fatigue": "fatigue",
+    "goal_distance": "goal_distance",
+    "goal_time": "goal_time",
+    "remaining_days": "remaining_days",
+    "distance": "distance",
+    "pace": "pace",
+    "hr": "hr"
+}

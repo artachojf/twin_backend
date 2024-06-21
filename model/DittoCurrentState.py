@@ -24,7 +24,7 @@ class Thing:
         return datetime(year=int(split[1]), month=int(split[2]), day=int(split[3]))
     
 class Attributes:
-    def __init__(self, googleId) -> None:
+    def __init__(self, googleId, date) -> None:
         self.googleId = googleId
 
 class Features:
@@ -37,17 +37,27 @@ class TrainingSession:
         self.properties = TrainingSessionProperties(**properties)
 
 class TrainingSessionProperties:
-    def __init__(self, zone1, zone2, zone3, rest) -> None:
+    def __init__(self, zone1, zone2, zone3, rest, laps) -> None:
         self.zone1 = TrainingSessionZone(**zone1)
         self.zone2 = TrainingSessionZone(**zone2)
         self.zone3 = TrainingSessionZone(**zone3)
         self.rest = TrainingSessionZone(**rest)
+        list = []
+        for x in laps:
+            list.append(TrainingLap(**x))
+        self.laps = list
     
 class TrainingSessionZone:
     def __init__(self, avgHr, time, distance):
         self.avgHr = avgHr
         self.time = time
         self.distance = distance
+
+class TrainingLap:
+    def __init__(self, startTime, distance, time) -> None:
+        self.startTime = startTime
+        self.distance = distance
+        self.time = time
 
 class SleepRating:
     def __init__(self, properties) -> None:
