@@ -3,10 +3,13 @@ from pmdarima.arima import auto_arima
 from datetime import datetime
 import os
 from dotenv import load_dotenv
-from sklearn.metrics.pairwise import cosine_similarity
 from .model.DittoGeneralInfo import *
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
+import tensorflow as tf
+from sklearn.preprocessing import MinMaxScaler
+import pickle
+import numpy as np
 
 load_dotenv()
 N_DAYS = int(os.getenv('N_DAYS'))
@@ -51,19 +54,55 @@ def getPredictions(column: pd.DataFrame, nPeriods: int) -> float:
     print(predictions)
     return predictions.iloc[-1]
 
+def normalize_data(df, file_name='scaler.pkl', fromFile=False):
+    if fromFile:
+        with open(file_name, 'rb') as f:
+            scaler = pickle.load(f)
+    else:
+        scaler = MinMaxScaler()
+
+    scaler.fit(df)
+    normalized_df = scaler.transform(df)
+
+    if not fromFile:
+        with open(file_name, 'wb') as f:
+            pickle.dump(scaler, f)
+
+    return normalized_df
+
+def denormalize_data(data, file_name='scaler.pkl'):
+    with open(file_name, 'rb') as f:
+        scaler = pickle.load(f)
+    return scaler.inverse_transform(data)
+
+
+def next_weekday_date(weekdays: list[int]):
+    weekday = datetime.now().weekday()
+    days = 0
+    while weekday not in weekdays:
+        days += 1
+        weekday = (weekday + 1) % 7
+    return datetime.now() + timedelta(days=days)
+
 def generateTrainingPlan(
         preferences: PreferencesProperties,
         goal: GoalProperties,
-        data: pd.DataFrame,
-        estimation: float,
-        slope: float
+        file_name = 'data/neural_network.keras'
     ) -> TrainingPlanProperties:
 
-    preferences.trainingDays
-    datetime.now().isoweekday
+    training_date = next_weekday_date(preferences.trainingDays)
+    remaining_days = (goal.date - training_date).days
+
+    #TODO: Calculate the fatigue
+
+    model = tf.keras.models.load_model(file_name)
+    data_array = np.array([list(fatigue, goal.seconds, goal.distance, remaining_days)])
+    data_array = normalize_data(data_array, 'input_scaler.pkl', True)
+    output = model.predict(data_array)
+    output = denormalize_data(output, 'output_scaler.pkl')
 
     #TODO: Generate training plan
-    cosine_similarity()
+
     return
 
 def generateSuggestions(
