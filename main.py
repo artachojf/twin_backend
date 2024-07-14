@@ -3,7 +3,7 @@ import requests
 import json
 import re
 import requests
-from ditto_threads import DittoCurrentStateThread
+from .ditto_threads import DittoCurrentStateThread
 import os
 from dotenv import load_dotenv
 
@@ -23,5 +23,5 @@ for event in client.events():
             split = data['thingId'].split(':')
             if len(data) > 1 and re.fullmatch(DITTO_THING_SUFIX_REGEX, split[1]):
                 thread = DittoCurrentStateThread(split[1])
+                thread.run()
             #else: thread = dittoGeneralInfoThread(split[1]) #it will commented until it is found if it is necessary
-            thread.run()

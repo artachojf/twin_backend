@@ -19,7 +19,7 @@ def filter_columns(json_file='columns.json', save=False) -> pd.DataFrame:
         json_data = json.load(f)
 
     file_name = json_data["file"]
-    columns = [json_data["fatigue"], json_data["goal_distance"], json_data["goal_time"], json_data["remaining_days"], json_data["distance"], json_data["repetitions"], json_data["pace"], json_data["hr"]]
+    columns = [json_data["fatigue"], json_data["goal_distance"], json_data["goal_time"], json_data["remaining_days"], json_data["distance"], json_data["pace"], json_data["hr"]]
     df = pd.read_csv(file_name)
     df = df[columns]
     
@@ -57,8 +57,8 @@ def normalize_data(df, file_name='scaler.pkl', fromFile=False):
     return normalized_df
 
 def normalize_dataset(df, input, output):
-    df[input] = normalize_data(df[input], 'input_scaler_interval.pkl')
-    df[output] = normalize_data(df[output], 'output_scaler_interval.pkl')
+    df[input] = normalize_data(df[input], 'input_scaler.pkl')
+    df[output] = normalize_data(df[output], 'output_scaler.pkl')
     return df
 
 def denormalize_data(data, file_name='scaler.pkl'):
@@ -95,9 +95,9 @@ def predict_regression_values(data, file_name="model.pkl"):
 def predict_neural_network_values(data, file_name='neural_network.keras'):
     model = tf.keras.models.load_model(file_name)
     data_array = np.array([list(data.values())])
-    data_array = normalize_data(data_array, 'input_scaler_interval.pkl', True)
+    data_array = normalize_data(data_array, 'input_scaler.pkl', True)
     output = model.predict(data_array)
-    output = denormalize_data(output, 'output_scaler_interval.pkl')
+    output = denormalize_data(output, 'output_scaler.pkl')
     print(output)
 
 def generate_decision_tree(data, input, output, file_name='decision_tree.pkl'):
@@ -119,12 +119,12 @@ def predict_decision_tree_values(data, file_name='decision_tree.pkl'):
     output = model.predict(data_array)
     print(output)
 
-#data = filter_columns(json_file='columns.json', save=False)
+'''data = filter_columns(json_file='columns.json', save=False)
 input = ['fatigue','goal_distance','goal_time','remaining_days']
-'''output = ['distance','repetitions','pace','hr']
-generate_neural_network(data, input, output, 'interval_neural_network.keras')'''
+output = ['distance','pace','hr'] #['distance','repetitions','pace','hr']
+generate_neural_network(data, input, output, 'neural_network.keras')'''
 '''output = ['session_type']
 generate_decision_tree(data, input, output)'''
 data = {"fatigue": 98, "goal_distance": 23456, "goal_time": 18200, "remaining_days": 32}
-#predict_neural_network_values(data, 'interval_neural_network.keras')
+predict_neural_network_values(data, 'neural_network.keras')
 #predict_decision_tree_values(data)

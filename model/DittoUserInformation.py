@@ -27,7 +27,7 @@ class DittoUserInformation:
 
     def uploadChanges(self):
         requests.put(DITTO_BASE_URL + '/api/2/things/' + self.generalInfo.thingId,
-                     data=json.dumps(self.generalInfo))
+                     data=json.dumps(self.generalInfo.to_dict()))
 
     def trainingParameters(self) -> dict:
         distance, time, atDistance, atTime = 0.0, 0.0, 0.0, 0.0
@@ -39,7 +39,7 @@ class DittoUserInformation:
             atDistance += session.zone2.distance
             atTime += session.zone2.time
 
-        days = (datetime.now() - self.trainings[0].getDate()).days
+        days = (datetime.now() - self.trainings[len(self.trainings)-1].getDate()).days
         return {
             'weeklyDistance': ((distance / days) * 7),
             'weeklyTrainingDays': ((float(len(self.trainings)) / days) * 7),
@@ -48,11 +48,11 @@ class DittoUserInformation:
             'anaerobicThresholdSpeed': (atDistance / atTime)
         }
 
-    def calculateCurrentState(self) -> tuple[datetime,str,float,float,float,float]:
+    def calculateCurrentState(self, date: datetime) -> tuple[datetime,str,float,float,float,float]:
 
-        bmi = self.generalInfo.attributes.weigth / ((self.generalInfo.attributes.heigth / 100) ** 2) #kg/m2
-        runningExp = (datetime.now() - datetime(self.generalInfo.attributes.runningYear)).days / 365 #year
-        age = (datetime.now() - datetime(self.generalInfo.attributes.birthYear)).days / 365 #year
+        bmi = self.generalInfo.attributes.weight / ((self.generalInfo.attributes.height / 100) ** 2) #kg/m2
+        runningExp = (date - self.generalInfo.attributes.runningDate).days / 365 #year
+        age = (date - self.generalInfo.attributes.birthdate).days / 365 #year
 
         parameters = self.trainingParameters()
         weeklyDistance = parameters['weeklyDistance'] / 1000 #km/wk
@@ -62,17 +62,16 @@ class DittoUserInformation:
         anaerobicThresholdSpeed = parameters['anaerobicThresholdSpeed'] #m/s
 
         bodyFat = 0.0 #%
-        if self.generalInfo.attributes.gender != 1: bodyFat += (1.2*bmi) + (0.23*age) - 16.2
-        if self.generalInfo.attributes.gender != 0: bodyFat += (1.20*bmi) + (0.23*age) - 5.4
-        if self.generalInfo.attributes.gender > 1: bodyFat /= 2
+        if self.generalInfo.attributes.gender != 'Female': bodyFat += (1.2*bmi) + (0.23*age) - 16.2
+        if self.generalInfo.attributes.gender != 'Male': bodyFat += (1.20*bmi) + (0.23*age) - 5.4
+        if self.generalInfo.attributes.gender != 'Female' and self.generalInfo.attributes.gender != 'Male': bodyFat /= 2
     
         fourtyTwoKm = self.current42kPrediction(weeklyDistance, trainingSpeed, bodyFat, anaerobicThresholdSpeed, age, hoursToMinutes(weeklyTrainingTime/weeklyTrainingDays))
         twentyOneKm = self.current21kPrediction(bodyFat, trainingSpeed, fourtyTwoKm)
         tenKm = self.current10kPrediction(bmi, weeklyDistance, weeklyTrainingDays, weeklyTrainingTime, runningExp, twentyOneKm)
         fiveKm = self.current5kPrediction(tenKm)
         
-        #TODO: Training day may not be today (no internet connection...)
-        return (datetime.now().strftime('%Y-%m-%d'),self.clientId,fiveKm,tenKm,twentyOneKm,fourtyTwoKm)
+        return (date.strftime('%Y-%m-%d'),self.clientId,fiveKm,tenKm,twentyOneKm,fourtyTwoKm)
 
     '''
     1. Daniels' formula
@@ -96,9 +95,9 @@ class DittoUserInformation:
     '''
     def current21kPrediction(self, bodyFat: float, trainingSpeed: float, fourtyTwoKm: float) -> float:
         sum = 0
-        if self.generalInfo.attributes.gender != 1 : sum += (142.7 + (1.158*bodyFat) - (5.223*trainingSpeed)) * 60
-        if self.generalInfo.attributes.gender != 0 : sum += (168.7 + (1.077*bodyFat) - (7.556*trainingSpeed)) * 60
-        if self.generalInfo.attributes.gender > 1: sum /= 2
+        if self.generalInfo.attributes.gender != 'Female': sum += (142.7 + (1.158*bodyFat) - (5.223*trainingSpeed)) * 60
+        if self.generalInfo.attributes.gender != 'Male': sum += (168.7 + (1.077*bodyFat) - (7.556*trainingSpeed)) * 60
+        if self.generalInfo.attributes.gender != 'Female' and self.generalInfo.attributes.gender != 'Male': sum /= 2
         sum += danielsFormula(42195, fourtyTwoKm, 21097)
         return sum / 2
 

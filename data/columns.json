@@ -1,11 +1,10 @@
 {
-    "file": "interval_dataset.csv",
+    "file": "dataset.csv",
     "fatigue": "fatigue",
     "goal_distance": "goal_distance",
     "goal_time": "goal_time",
     "remaining_days": "remaining_days",
     "distance": "distance",
-    "repetitions": "repetitions",
     "pace": "pace",
     "hr": "hr"
 }

@@ -1,38 +1,38 @@
 import threading
 import time
-import ditto_utils
-import mysql_manager
+from .ditto_utils import *
+from .mysql_manager import *
 import os
 from dotenv import load_dotenv
-from model.DittoUserInformation import DittoUserInformation
+from .model.DittoUserInformation import DittoUserInformation
 
 load_dotenv()
-N_DAYS = int(os.getenv('N_DAYS'))
 DITTO_BASE_URL = os.getenv('DITTO_BASE_URL')
 
 class DittoCurrentStateThread(threading.Thread):
     def __init__(self, thingId):
         threading.Thread.__init__(self)
-        self.clientId = thingId.split('-')[0]
+        split = thingId.split('-')
+        self.clientId = split[0]
+        self.date = datetime(year=int(split[1]), month=int(split[2]), day=int(split[3]))
 
     def run(self):
         time.sleep(5) #sleep 5 seconds to compensate Ditto's reading delay
 
         user = DittoUserInformation(self.clientId)
-        values = user.calculateCurrentState()
+        values = user.calculateCurrentState(self.date)
         print(values)
         
         try:
-            mysql_manager.insertValues(values)
+            insertValues(values)
         except:
             values = (values[2],values[3],values[4],values[5],values[1],values[0])
-            mysql_manager.updateValues(values)
+            updateValues(values)
 
-        data = mysql_manager.selectValues(self.clientId)
+        data = selectValues(self.clientId)
         print(data)
         if len(data) >= 10:
-            features = ditto_utils.updateThing(data, user.generalInfo.features.goal.properties, user.generalInfo.features.preferences.properties)
-            user.generalInfo.features = features
+            updateThing(data, user)
             user.uploadChanges()
 
 class DittoGeneralInfoThread(threading.Thread):
