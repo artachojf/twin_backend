@@ -125,7 +125,10 @@ class SuggestionProperties:
     def __init__(self, suggestions) -> None:
         list = []
         for x in suggestions:
-            list.append(SuggestionDetail(**x))
+            if type(x) == SuggestionDetail:
+                list.append(x)
+            else:
+                list.append(SuggestionDetail(**x))
         self.suggestions = list
 
     def to_dict(self):

@@ -36,7 +36,7 @@ def updateThing(
     data = fill_missing_days(data)
     column = getEstimationColumn(user.generalInfo.features.goal.properties.distance, data)
     estimation = float(column.iloc[-1, 0])
-    print(estimation)
+    print(estimation) #Calculate estimation using mathematical formulas
     newEstimations = []
     for x in user.generalInfo.features.goal.properties.estimations:
         if x.date.date() != datetime.today().date():
@@ -45,7 +45,7 @@ def updateThing(
     user.generalInfo.features.goal.properties.estimations = newEstimations
 
     prediction = getPredictions(column, (user.generalInfo.features.goal.properties.date - datetime.now()).days)
-    print(prediction)
+    print(prediction) #Calculate prediction using ARIMA
 
     calculate_fatigue(user.generalInfo.features.fatigue.properties, user.trainings)
 
@@ -61,9 +61,8 @@ def updateThing(
     plan.append(suggested_session)
     user.generalInfo.features.trainingPlan.properties.sessions = plan
 
-    slope = getSlope(user.generalInfo.features.goal.properties, estimation)
-    suggestions = generateSuggestions(user.generalInfo.features.goal.properties, data, prediction, slope)
-    #user.generalInfo.features.suggestions.properties = suggestions
+    suggestions = generateSuggestions(user.generalInfo.features.goal.properties, prediction, user.generalInfo.features.preferences.properties)
+    user.generalInfo.features.suggestions.properties = suggestions
 
     return user
 
@@ -189,15 +188,125 @@ def generateTrainingPlan(
 
     return session
 
+def suggest_more_training_days(days: list[int]) -> list[int]:
+    if len(days) >= 6:
+        return days
+    
+    maxDiffDay, daysGap = 0, 0
+    for i in len(days):
+        if i != len(days)-1:
+            gap = days[i+1] - days[i]
+        else:
+            gap = days[0] + 7 - days[i]
+        
+        if gap > daysGap:
+            maxDiffDay = days[i]
+            daysGap = gap
+
+        days.append((maxDiffDay + int(daysGap/2)) % 7)
+
+    return days
+
+def suggest_less_training_days(days: list[int]) -> list[int]:
+    if len(days) <= 2:
+        return days
+    
+    minDiffDay, daysGap = 0, 0
+    for i in len(days):
+        if i != len(days)-1:
+            gap = days[i+1] - days[i]
+        else:
+            gap = days[0] + 7 - days[i]
+        
+        if gap < daysGap:
+            minDiffDay = days[(i+1)%7]
+            daysGap = gap
+
+        days.remove(minDiffDay)
+    
+    return days
+
 def generateSuggestions(
         goal: GoalProperties,
-        data: pd.DataFrame,
         prediction: float,
-        slope: float
+        preferences: PreferencesProperties
     ) -> SuggestionProperties:
+
+    class SuggestionType(Enum):
+        SMALLER_GOAL = 0
+        BIGGER_GOAL = 1
+        LESS_TRAINING_DAYS = 2
+        MORE_TRAINING_DAYS = 3
+
+    newSuggestions = []
     
-    #TODO: Generate suggestions
-    return
+    print("Goal:",goal.seconds, "\tPrediction:" , prediction)
+    if goal.seconds*1.1 < prediction: #The athlete is considerably far from the goal
+        newSuggestions.append(
+            SuggestionDetail(
+                len(newSuggestions),
+                SuggestionType.SMALLER_GOAL.value,
+                0.7*goal.distance,
+                0.7*goal.seconds,
+                goal.date.strftime("%Y-%m-%d"),
+                []
+            )
+        )
+        newSuggestions.append(
+            SuggestionDetail(
+                len(newSuggestions),
+                SuggestionType.SMALLER_GOAL.value,
+                goal.distance,
+                1.1*goal.seconds,
+                goal.date.strftime("%Y-%m-%d"),
+                []
+            )
+        )
+        if len(preferences.trainingDays) < 6:
+            newSuggestions.append(
+                SuggestionDetail(
+                    len(newSuggestions),
+                    SuggestionType.MORE_TRAINING_DAYS.value,
+                    goal.distance,
+                    goal.seconds,
+                    goal.date.strftime("%Y-%m-%d"),
+                    suggest_more_training_days(preferences.trainingDays)
+                )
+            )
+    elif goal.seconds*0.9 > prediction: #The athlete is considerably over the goal
+        newSuggestions.append(
+            SuggestionDetail(
+                len(newSuggestions),
+                SuggestionType.BIGGER_GOAL.value,
+                1.3*goal.distance,
+                1.3*goal.seconds,
+                goal.date.strftime("%Y-%m-%d"),
+                []
+            )
+        )
+        newSuggestions.append(
+            SuggestionDetail(
+                len(newSuggestions),
+                SuggestionType.BIGGER_GOAL.value,
+                goal.distance,
+                0.9*goal.seconds,
+                goal.date.strftime("%Y-%m-%d"),
+                []
+            )
+        )
+        if len(preferences.trainingDays) > 3:
+            newSuggestions.append(
+                SuggestionDetail(
+                    len(newSuggestions),
+                    SuggestionType.LESS_TRAINING_DAYS.value,
+                    goal.distance,
+                    goal.seconds,
+                    goal.date.strftime("%Y-%m-%d"),
+                    suggest_less_training_days(preferences.trainingDays)
+                )
+            )
+
+    return SuggestionProperties(newSuggestions)
 
 def parseDate(year: str, month: str, day: str) -> datetime:
     return datetime(year=int(year), month=int(month), day=int(day))
@@ -224,11 +333,6 @@ def getEstimationColumn(goal: float, data: pd.DataFrame) -> pd.DataFrame:
         return data[['42k']]
     elif goal > Distances.MARATHON.value:
         return data[['42k']] * (goal / Distances.MARATHON.value)
-
-def getSlope(goal: GoalProperties, estimation: float) -> float:
-    daysOffset = (datetime.now() - goal.date).days
-    timesOffset = goal.seconds - estimation
-    return timesOffset / daysOffset
 
 def getCoeficients(distance: float, below: float, above: float) -> tuple[float, float]:
     offset = above - below
