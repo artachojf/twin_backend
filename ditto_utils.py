@@ -1,5 +1,4 @@
 import pandas as pd
-from pmdarima.arima import auto_arima
 from datetime import datetime
 from dotenv import load_dotenv
 from .model.DittoGeneralInfo import *
@@ -7,20 +6,13 @@ from .model.DittoCurrentState import Thing as CurrentState
 from .model.DittoUserInformation import DittoUserInformation
 from datetime import datetime, timedelta
 from enum import Enum
-import tensorflow as tf
-import pickle
-import numpy as np
 import os
+import requests
+import json
 
 load_dotenv()
-INTERVAL_NEURAL_NETWORK = 'data\\interval_neural_network.keras'
-INTERVAL_INPUT_SCALER = 'data\\input_scaler_interval.pkl'
-INTERVAL_OUTPUT_SCALER = 'data\\output_scaler_interval.pkl'
-CONTINUOUS_NEURAL_NETWORK = 'data\\neural_network.keras'
-CONTINUOUS_INPUT_SCALER = 'data\\input_scaler.pkl'
-CONTINUOUS_OUTPUT_SCALER = 'data\\output_scaler.pkl'
-DECISION_TREE = 'data\\decision_tree.pkl'
-FILE_PATH = os.path.dirname(os.path.abspath(__file__))
+TRAINING_MICROSERVICE_URL = os.getenv('TRAINING_MICROSERVICE_URL')
+ARIMA_MICROSERVICE_URL = os.getenv('ARIMA_MICROSERVICE_URL')
 
 class Distances(Enum):
     FIVE_KM = 5000
@@ -36,7 +28,7 @@ def updateThing(
     data = fill_missing_days(data)
     column = getEstimationColumn(user.generalInfo.features.goal.properties.distance, data)
     estimation = float(column.iloc[-1, 0])
-    print(estimation) #Calculate estimation using mathematical formulas
+    print(estimation) #Calculated estimation using mathematical formulas
     newEstimations = []
     for x in user.generalInfo.features.goal.properties.estimations:
         if x.date.date() != datetime.today().date():
@@ -85,22 +77,16 @@ def fill_missing_days(df: pd.DataFrame) -> pd.DataFrame:
     data = pd.DataFrame(completed_data)
     return data
 
-def getPredictions(column: pd.DataFrame, nPeriods: int) -> float:
-    model = auto_arima(column, start_p=0, start_q=0,
-                    test='adf',
-                    max_p=5, max_q=5,
-                    m=1,
-                    q=1,
-                    seasonal=True,
-                    start_P=0,
-                    D=None,
-                    trace=True,
-                    error_action='ignore',
-                    suppress_warnings=True,
-                    stepwise=True)
-    predictions = model.predict(n_periods=nPeriods)
-    return float(predictions.iloc[-1])
+def getPredictions(column: pd.DataFrame, n: int) -> float:
+    data = {
+        'column': list(column.iloc[:,0]),
+        'n': n
+    }
+    r = requests.post(ARIMA_MICROSERVICE_URL, json=data)
+    response = json.loads(r.text)
+    print(response)
 
+    return float(response['prediction'])
 
 def next_weekday_date(weekdays: list[int]):
     weekday = datetime.now().weekday()
@@ -109,58 +95,6 @@ def next_weekday_date(weekdays: list[int]):
         days += 1
         weekday = (weekday + 1) % 7
     return datetime.now() + timedelta(days=days)
-
-def predict_decision_tree_values(data: dict, file_name: str) -> str:
-    path = os.path.join(FILE_PATH, file_name)
-    with open(path, 'rb') as f:
-        model = pickle.load(f)
-
-    data_array = np.array([list(data.values())])
-    output = model.predict(data_array)
-    return output[0]
-
-def normalize_data(data, file_name: str):
-    path = os.path.join(FILE_PATH, file_name)
-    with open(path, 'rb') as f:
-        scaler = pickle.load(f)
-    scaler.fit(data)
-    normalized_data = scaler.transform(data)
-    with open(path, 'wb') as f:
-        pickle.dump(scaler, f)
-    return normalized_data
-
-def denormalize_data(data, file_name: str):
-    path = os.path.join(FILE_PATH, file_name)
-    with open(path, 'rb') as f:
-        scaler = pickle.load(f)
-    return scaler.inverse_transform(data)
-
-def predict_neural_network_values(
-        data: dict,
-        file_name: str,
-        input_scaler: str,
-        output_scaler: str
-    ):
-
-    path = os.path.join(FILE_PATH, file_name)
-    model = tf.keras.models.load_model(path)
-    data_array = np.array([list(data.values())])
-    data_array = normalize_data(data_array, input_scaler)
-    output = model.predict(data_array)
-    output = denormalize_data(output, output_scaler)
-    return output[0]
-
-def process_interval_output(output, date: datetime) -> TrainingSession:
-    distance = output[0]
-    pace = output[2]
-    time = ((distance / 1000) * pace) * 60
-    return TrainingSession(date, output[0], round(output[1]), int(time/2), int(time), output[3])
-
-def process_continuous_output(output, date: datetime) -> TrainingSession:
-    distance = output[0]
-    pace = output[1]
-    time = ((distance / 1000) * pace) * 60
-    return TrainingSession(date, output[0], 1, int(time/2), int(time), output[2])
 
 def generateTrainingPlan(
         preferences: PreferencesProperties,
@@ -171,29 +105,18 @@ def generateTrainingPlan(
     training_date = next_weekday_date(preferences.trainingDays)
     remaining_days = (goal.date - training_date).days
 
-    data = {
-        'fatigue': fatigue,
-        'goal_distance': goal.distance,
-        'goal_time': goal.seconds,
-        'remaining_days': remaining_days
-    }
+    r = requests.get(f'{TRAINING_MICROSERVICE_URL}?ctl={fatigue}&remaining_days={remaining_days}&distance={goal.distance}&time={goal.seconds}')
+    response = json.loads(r.text)
+    print(response)
 
-    session_type = predict_decision_tree_values(data, DECISION_TREE)
-    if session_type == 'Interval':
-        output = predict_neural_network_values(data, INTERVAL_NEURAL_NETWORK, INTERVAL_INPUT_SCALER, INTERVAL_OUTPUT_SCALER)
-        session = process_interval_output(output, training_date)
-    else:
-        output = predict_neural_network_values(data, CONTINUOUS_NEURAL_NETWORK, CONTINUOUS_INPUT_SCALER, CONTINUOUS_OUTPUT_SCALER)
-        session = process_continuous_output(output, training_date)
-
-    return session
+    return TrainingSession(training_date, response['distance'], response['times'], int(response['seconds']/2), response['seconds'], response['hr'])
 
 def suggest_more_training_days(days: list[int]) -> list[int]:
     if len(days) >= 6:
         return days
     
     maxDiffDay, daysGap = 0, 0
-    for i in len(days):
+    for i in range(len(days)):
         if i != len(days)-1:
             gap = days[i+1] - days[i]
         else:
@@ -212,7 +135,7 @@ def suggest_less_training_days(days: list[int]) -> list[int]:
         return days
     
     minDiffDay, daysGap = 0, 0
-    for i in len(days):
+    for i in range(len(days)):
         if i != len(days)-1:
             gap = days[i+1] - days[i]
         else:

@@ -1,12 +1,20 @@
 import mysql.connector
 import pandas as pd
 from datetime import datetime
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+DB_HOST = os.getenv('DB_HOST')
+DB_USER = os.getenv('DB_USER')
+DB_PWD = os.getenv('DB_PWD')
+DB_NAME = os.getenv('DB_NAME')
 
 mydb = mysql.connector.connect(
-  host="localhost",
-  user="root",
-  password="root",
-  database="ditto"
+  host=DB_HOST,
+  user=DB_USER,
+  password=DB_PWD,
+  database=DB_NAME
 )
 mycursor = mydb.cursor(buffered=True)
 
