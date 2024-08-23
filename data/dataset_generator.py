@@ -31,9 +31,7 @@ def pace_to_float(df, column_name):
     df[column_name] = df[column_name].apply(time_to_decimal)
     return df
 
-df = pd.DataFrame(columns=['fatigue','goal_distance','goal_time','remaining_days','distance','pace','hr'])
-#df = pd.DataFrame(columns=['fatigue','goal_distance','goal_time','remaining_days','distance','repetitions','pace','hr'])
-#df = pd.DataFrame(columns=['fatigue','goal_distance','goal_time','remaining_days','session_type'])
+df = pd.DataFrame(columns=['Fatiga','Distancia_objetivo','Tiempo_objetivo','Dias_restantes','Distancia','Repeticiones','Ritmo','Frecuencia_cardiaca','Tipo_sesion'])
 
 for i in range(5000):
 
@@ -43,26 +41,28 @@ for i in range(5000):
 
     for j in range(100):
 
+        session_type = random.randint(0,1)
+        if session_type == 0: session_type = "Interval"
+        else: session_type = "Continuous"
+
         remaining_days = j+1
         fatigue = random.uniform(0.0, 100.0)
 
         distance = goal_distance * random.uniform(0.9, 2) * (1 - (fatigue/100))
-        '''repetitions = random.randint(2,8)
-        rep_distance = distance / repetitions'''
+        if session_type == "Interval":
+            repetitions = random.randint(2,8)
+            distance = distance / repetitions
+        else:
+            repetitions = 1
+            distance = distance / repetitions
 
         pace = goal_pace * random.uniform(0.9, 1.1)
         hr = 160 * random.uniform(0.85, 1.15) / (pace / goal_pace)
 
-        '''session_type = random.randint(0,1)
-        if session_type == 0: session_type = "Interval"
-        else: session_type = "Continuous"'''
-
-        list = [fatigue,goal_distance,goal_time,remaining_days,distance,pace,hr]
-        #list = [fatigue,goal_distance,goal_time,remaining_days,rep_distance,repetitions,pace,hr]
-        #list = [fatigue,goal_distance,goal_time,remaining_days,session_type]
+        list = [fatigue,goal_distance,goal_time,remaining_days,distance,repetitions,pace,hr,session_type]
         df.loc[j+i*100] = list
 
     print(i)
 
 print(df.head())
-df.to_csv('decision_tree_dataset.csv', index=False)
+df.to_csv('dataset_2.csv', index=False)

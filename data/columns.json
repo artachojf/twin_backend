@@ -1,10 +1,12 @@
 {
     "file": "dataset.csv",
-    "fatigue": "fatigue",
-    "goal_distance": "goal_distance",
-    "goal_time": "goal_time",
-    "remaining_days": "remaining_days",
-    "distance": "distance",
-    "pace": "pace",
-    "hr": "hr"
+    "fatigue": "Fatiga",
+    "goal_distance": "Distancia_objetivo",
+    "goal_time": "Tiempo_objetivo",
+    "remaining_days": "Dias_restantes",
+    "distance": "Distancia",
+    "repetitions": "Repeticiones",
+    "pace": "Ritmo",
+    "hr": "Frecuencia_cardiaca",
+    "session_type": "Tipo_sesion"
 }
